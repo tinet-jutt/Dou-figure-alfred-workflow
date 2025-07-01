@@ -6,14 +6,26 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
-	"time"
-
 	"github.com/PuerkitoBio/goquery"
 )
+import (
+	"crypto/tls"
+	"net/http"
+	"time"
+)
+
+// 定义跳过证书验证的 HTTP 客户端
+var insecureClient = &http.Client{
+	Timeout: 10 * time.Second,
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // 关键点：跳过证书校验
+		},
+	},
+}
 
 const QueryUrl = "https://www.doutula.com/search?keyword="
 const ImgPath = "images"
@@ -50,7 +62,7 @@ func GetXML(list []Item) string {
 
 func getContent(query string) {
 	url := QueryUrl + query
-	resp, err := http.Get(url)
+	resp, err := insecureClient.Get(url)
 	if err != nil {
 		log.Fatal("网络请求失败:", err)
 	}
@@ -96,10 +108,14 @@ func saveFile(url string) string {
 	if exist(filename) {
 		return ""
 	}
-	resp, _ := http.Get(url)
+	resp, err := insecureClient.Get(url)
+	if err != nil {
+		log.Println("下载失败:", url, err)
+		return ""
+	}
 	defer resp.Body.Close()
-	pix, _ := ioutil.ReadAll(resp.Body)
 
+	pix, _ := ioutil.ReadAll(resp.Body)
 	if err := ioutil.WriteFile(filename, pix, 0777); err != nil {
 		log.Fatal(err)
 	}
